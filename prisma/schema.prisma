@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  profileImage String?
+  role         Role     @default(USER)
+  department   String
+  firstName    String
+  lastName     String
+  password     String
+  email        String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  docsSent     Doc[]    @relation("DocsSent")
+  docsReceived DocRecipient[]
+}
+
+model Doc {
+  id                  Int              @id @default(autoincrement())
+  docNumber           String
+  senderId            Int
+  sender              User             @relation("DocsSent", fields: [senderId], references: [id])
+  docHeader           String
+  docInfo             String
+  status              Status           @default(PENDING)
+  contentPDF          String?
+  supportingDocuments String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  recipients          DocRecipient[]
+}
+
+model DocRecipient {
+  id          Int      @id @default(autoincrement())
+  docId       Int
+  doc         Doc      @relation(fields: [docId], references: [id])
+  recipientId Int
+  recipient   User     @relation(fields: [recipientId], references: [id])
+  status      Status   @default(PENDING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Status {
+  PENDING
+  ACCEPTED
+}
+
+enum Topic {
+  APPROVE
+  REVIEW
+}
