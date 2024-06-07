@@ -15,4 +15,10 @@ router.post(
   contentController.CreateContent
 );
 
+router.get(
+  "/showalldoc",
+  // authenticateMiddleware,
+  contentController.GetAllDoc
+);
+
 module.exports = router;

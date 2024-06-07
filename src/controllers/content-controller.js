@@ -30,3 +30,31 @@ exports.CreateContent = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.GetAllDoc = async (req, res, next) => {
+  try {
+    const Docids = await prisma.doc.findMany({
+      select: {
+        id: true,
+        docNumber: true,
+        docHeader: true,
+        createdAt: true,
+        status: true,
+        contentPDF: true,
+        sender: { 
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            department:true  
+          }
+        },
+      },
+    });
+    res.status(200).json({ Docids });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
