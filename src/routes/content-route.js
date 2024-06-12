@@ -17,8 +17,9 @@ router.post(
 
 router.get(
   "/showalldoc",
-  // authenticateMiddleware,
+  authenticateMiddleware,
   contentController.GetAllDoc
 );
+
 
 module.exports = router;

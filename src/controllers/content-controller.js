@@ -33,7 +33,67 @@ exports.CreateContent = async (req, res, next) => {
 
 exports.GetAllDoc = async (req, res, next) => {
   try {
-    const Docids = await prisma.doc.findMany({
+    if (req.user.role === 'ADMIN') {
+      const Docids = await prisma.doc.findMany({
+        orderBy: {
+          createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          docNumber: true,
+          docHeader: true,
+          createdAt: true,
+          status: true,
+          contentPDF: true,
+          sender: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              department: true
+            }
+          },
+        },
+      });
+      res.status(200).json({ documents: Docids });
+    } else if (req.user.role === 'USER') {
+      const Docids = await prisma.doc.findMany({
+        where: { senderId: req.user.id }, 
+        orderBy: {
+          createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          docNumber: true,
+          docHeader: true,
+          createdAt: true,
+          status: true,
+          contentPDF: true,
+          sender: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              department: true
+            }
+          }
+        }
+      });
+      res.status(200).json({ documents: Docids });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+
+
+exports.ShowDocById = async (req, res, next) => {
+  try {
+    const showdoc = await prisma.doc.findMany({
+      where: { userId: req.user.id },
       select: {
         id: true,
         docNumber: true,
@@ -41,20 +101,19 @@ exports.GetAllDoc = async (req, res, next) => {
         createdAt: true,
         status: true,
         contentPDF: true,
-        sender: { 
+        sender: {
           select: {
             firstName: true,
             lastName: true,
             email: true,
-            department:true  
+            department: true
           }
         },
       },
     });
-    res.status(200).json({ Docids });
+
+    res.status(200).json({ showdoc });
   } catch (err) {
     next(err);
   }
 };
-
-

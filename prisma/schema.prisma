@@ -55,7 +55,8 @@ enum Role {
 
 enum Status {
   PENDING
-  ACCEPTED
+  APPROVED
+  REJECT
 }
 
 enum Topic {
