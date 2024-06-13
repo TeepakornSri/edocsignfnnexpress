@@ -28,6 +28,7 @@ model Doc {
   senderId            Int
   sender              User             @relation("DocsSent", fields: [senderId], references: [id])
   docHeader           String
+  topic               Topic
   docInfo             String
   status              Status           @default(PENDING)
   contentPDF          String?

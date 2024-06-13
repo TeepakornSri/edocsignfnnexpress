@@ -58,6 +58,7 @@ exports.CreateDocumentWithRecipients = async (req, res, next) => {
         docInfo: content.docInfo,
         contentPDF: content.contentPDF,
         supportingDocuments: content.supportingDocuments,
+        topic: content.topic, 
         recipients: {
           create: content.recipients.map(recipient => ({
             recipientId: parseInt(recipient.recipientId),
