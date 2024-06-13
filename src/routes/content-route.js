@@ -5,6 +5,15 @@ const uploadMiddleware = require("../middlewares/upload");
 
 const router = express.Router();
 
+// router.post(
+//   "/",
+//   authenticateMiddleware,
+//   uploadMiddleware.fields([
+//     { name: 'contentPDF', maxCount: 1 },
+//     { name: 'supportingDocuments', maxCount: 1 }
+//   ]),
+//   contentController.CreateContent
+// );
 router.post(
   "/",
   authenticateMiddleware,
@@ -12,7 +21,7 @@ router.post(
     { name: 'contentPDF', maxCount: 1 },
     { name: 'supportingDocuments', maxCount: 1 }
   ]),
-  contentController.CreateContent
+  contentController.CreateDocumentWithRecipients
 );
 
 router.get(

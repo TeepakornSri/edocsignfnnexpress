@@ -87,6 +87,7 @@ exports.GetAllUser = async (req, res, next) => {
         firstName: true,
         lastName: true,
         password: false,
+        department:true,
         email: true,
       },
     });
