@@ -45,9 +45,11 @@ model DocRecipient {
   recipientId Int
   recipient   User     @relation(fields: [recipientId], references: [id])
   status      Status   @default(PENDING)
+  step        Int      
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
 
 enum Role {
   ADMIN
