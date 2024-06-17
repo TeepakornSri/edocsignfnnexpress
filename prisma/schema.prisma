@@ -36,7 +36,10 @@ model Doc {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   recipients          DocRecipient[]
+  deleted             Boolean          @default(false) // เพิ่มฟิลด์นี้
+  deletedAt           DateTime?
 }
+
 
 model DocRecipient {
   id          Int      @id @default(autoincrement())

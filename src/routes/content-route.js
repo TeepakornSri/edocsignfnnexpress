@@ -36,4 +36,9 @@ router.get('/approve/:docId/:recipientId/:action', async (req, res, next) => {
     next(error);
   }
 });
+
+router.delete('/:docId/delete'
+  ,authenticateMiddleware,
+  contentController.softDeleteDocument
+)
 module.exports = router;

@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber, docHeader, docInfo, contentPDF, supportingDocuments, senderName, senderDepartment, currentStep, totalSteps, topic) => {
+const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber, docHeader, docInfo, contentPDF, supportingDocuments, senderName, senderDepartment, currentStep, totalSteps, topic, previousApprovedSteps) => {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -15,7 +15,6 @@ const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber,
   const approveLink = `${baseURL}/approve/${docId}/${recipientId}/approve`;
   const rejectLink = `${baseURL}/approve/${docId}/${recipientId}/reject`;
 
-
   let supportingDocumentsLink = '';
   if (supportingDocuments) {
     supportingDocumentsLink = `
@@ -23,6 +22,20 @@ const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber,
         <td style="padding-bottom: 16px;">
           <strong>เอกสารประกอบการพิจารณา:</strong>
           <a href="${supportingDocuments}" style="color: #1D4ED8; text-decoration: none;">ดาวน์โหลดเอกสารประกอบ</a>
+        </td>
+      </tr>
+    `;
+  }
+
+  let previousStepsInfo = '';
+  if (previousApprovedSteps && previousApprovedSteps.length > 0) {
+    previousStepsInfo = `
+      <tr>
+        <td style="padding-bottom: 16px;">
+          <strong>ขั้นตอนที่อนุมัติแล้ว:</strong>
+          <ul>
+            ${previousApprovedSteps.map(step => `<li>Step ${step.step}: ${step.name}</li>`).join('')}
+          </ul>
         </td>
       </tr>
     `;
@@ -71,6 +84,7 @@ const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber,
           </td>
         </tr>
         ${supportingDocumentsLink}
+        ${previousStepsInfo}
         <tr>
           <td style="padding-bottom: 16px;">
             <strong style="color: #1D4ED8;">สถานะ:</strong> Step ${currentStep} of ${totalSteps}
