@@ -237,11 +237,11 @@ exports.approveDocument = async (req, res, next) => {
         doc.contentPDF,
         doc.supportingDocuments,
         sender.department,
-        currentRecipient.step,
+        totalSteps,
         totalSteps,
         doc.topic,
         previousApprovedStepsInfo,
-        currentRecipient.step === totalSteps ? 'APPROVED' : 'PENDING'
+        'APPROVED'
       );
 
       // อัปเดตสถานะเอกสารเป็น 'APPROVED' เฉพาะเมื่อถึงขั้นตอนสุดท้ายและทุกคนอนุมัติแล้วเท่านั้น

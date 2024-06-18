@@ -34,7 +34,7 @@ const sendEmail = async (recipientEmail, subject, docId, recipientId, docNumber,
         <td style="padding-bottom: 16px;">
           <strong>ขั้นตอนที่อนุมัติแล้ว:</strong>
           <ul>
-            ${previousApprovedSteps.map(step => `<li>Step ${step.step}: ${step.name}</li>`).join('')}
+            ${previousApprovedSteps.map(step => `<li>Step ${step.step}: ${step.name} ${step.department}</li>`).join('')}
           </ul>
         </td>
       </tr>
