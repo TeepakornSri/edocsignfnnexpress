@@ -15,10 +15,17 @@ router.post(
   contentController.CreateDocumentWithRecipients
 );
 
+
 router.get(
   "/showalldoc",
   authenticateMiddleware,
   contentController.GetAllDoc
+);
+
+router.get(
+  "/docId/:docId",
+  authenticateMiddleware,
+  contentController.getDocById
 );
 
 router.get('/approve/:docId/:recipientId/:action', async (req, res, next) => {
@@ -37,8 +44,20 @@ router.get('/approve/:docId/:recipientId/:action', async (req, res, next) => {
   }
 });
 
+
+router.patch('/update/:docId', 
+  authenticateMiddleware, 
+  uploadMiddleware.fields([
+  { name: 'contentPDF', maxCount: 1 },
+  { name: 'supportingDocuments', maxCount: 1 }
+]), contentController.updateDocument)
+
+
 router.delete('/:docId/delete'
   ,authenticateMiddleware,
   contentController.softDeleteDocument
 )
+
+
+
 module.exports = router;

@@ -27,6 +27,20 @@ exports.GetAllDoc = async (req, res, next) => {
               email: true,
               department: true
             }
+          },
+          recipients: {
+            select: {
+              recipient: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  department: true
+                }
+              },
+              status: true,
+              step: true
+            }
           }
         }
       });
@@ -51,6 +65,20 @@ exports.GetAllDoc = async (req, res, next) => {
               email: true,
               department: true
             }
+          },
+          recipients: {
+            select: {
+              recipient: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  department: true
+                }
+              },
+              status: true,
+              step: true
+            }
           }
         }
       });
@@ -60,6 +88,73 @@ exports.GetAllDoc = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+
+
+///////////////// Doc By ID
+
+
+
+
+exports.getDocById = async (req, res, next) => {
+  const docId = parseInt(req.params.docId); // Parse docId to integer
+
+  try {
+    const document = await prisma.doc.findUnique({
+      where: {
+        id: docId,
+      },
+      select: {
+        id: true,
+        docNumber: true,
+        docHeader: true,
+        docInfo: true,
+        createdAt: true,
+        status: true,
+        contentPDF: true,
+        supportingDocuments: true,
+        sender: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            department: true,
+          },
+        },
+        recipients: {
+          select: {
+            recipient: {
+              select: {
+                id:true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                department: true,
+              },
+            },
+            status: true,
+            step: true,
+          },
+        },
+      },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Logging the fetched document to console
+    console.log('Fetched document:', document);
+
+    res.status(200).json({ doc: document });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 
 exports.CreateDocumentWithRecipients = async (req, res, next) => {
   try {
@@ -228,7 +323,7 @@ exports.approveDocument = async (req, res, next) => {
 
       const previousApprovedStepsInfo = await getPreviousApprovedStepsInfo(docId);
 
-      // ส่งอีเมลแจ้งเตือนผู้ส่งเอกสาร
+    
       await sendNotificationToSender(
         sender.email,
         doc.docNumber,
@@ -254,7 +349,7 @@ exports.approveDocument = async (req, res, next) => {
     } else {
       const previousApprovedStepsInfo = await getPreviousApprovedStepsInfo(docId);
 
-      // ส่งอีเมลแจ้งเตือนผู้ส่งเอกสารสำหรับขั้นตอนที่ไม่ใช่ขั้นตอนสุดท้าย
+      
       await sendNotificationToSender(
         sender.email,
         doc.docNumber,
@@ -349,3 +444,81 @@ exports.softDeleteDocument = async (req, res, next) => {
     next(err);
   }
 };
+
+
+exports.updateDocument = async (req, res, next) => {
+  try {
+      const { docId } = req.params;
+      const content = req.body;
+
+      const existingDoc = await prisma.doc.findUnique({ where: { id: parseInt(docId) } });
+      if (!existingDoc) {
+          return res.status(404).send('ไม่พบเอกสารที่ระบุ');
+      }
+
+      // จัดการอัปโหลดไฟล์
+      if (req.files && req.files.contentPDF) {
+          const uploadedPDF = await upload(req.files.contentPDF[0].path);
+          content.contentPDF = uploadedPDF;
+          await fs.unlink(req.files.contentPDF[0].path);
+      }
+
+      if (req.files && req.files.supportingDocuments) {
+          const uploadedSupportingDocument = await upload(req.files.supportingDocuments[0].path);
+          content.supportingDocuments = uploadedSupportingDocument;
+          await fs.unlink(req.files.supportingDocuments[0].path);
+      }
+
+      // อัปเดตเอกสาร
+      const updatedDoc = await prisma.doc.update({
+          where: { id: parseInt(docId) },
+          data: {
+              docNumber: content.docNumber || existingDoc.docNumber,
+              docHeader: content.docHeader || existingDoc.docHeader,
+              docInfo: content.docInfo || existingDoc.docInfo,
+              contentPDF: content.contentPDF || existingDoc.contentPDF,
+              supportingDocuments: content.supportingDocuments || existingDoc.supportingDocuments,
+              topic: content.topic || existingDoc.topic,
+          }
+      });
+
+      // อัปเดตผู้รับ
+      if (content.recipients && Array.isArray(content.recipients)) {
+          const recipientUpdates = content.recipients.map(async recipient => {
+              const recipientId = parseInt(recipient.recipientId);
+              const step = parseInt(recipient.step) || 1;
+
+              if (isNaN(recipientId)) {
+                  throw new Error(`Invalid recipient ID: ${recipient.recipientId}`);
+              }
+
+              if (recipient.id) {
+                  return prisma.docRecipient.update({
+                      where: { id: parseInt(recipient.id) },
+                      data: {
+                          recipientId: recipientId,
+                          status: recipient.status || 'PENDING',
+                          step: step
+                      }
+                  });
+              } else {
+                  return prisma.docRecipient.create({
+                      data: {
+                          docId: parseInt(docId),
+                          recipientId: recipientId,
+                          status: recipient.status || 'PENDING',
+                          step: step
+                      }
+                  });
+              }
+          });
+
+          await Promise.all(recipientUpdates);
+      }
+
+      res.status(200).json({ updatedDoc });
+  } catch (err) {
+      next(err);
+  }
+};
+
