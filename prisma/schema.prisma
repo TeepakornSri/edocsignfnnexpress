@@ -28,7 +28,6 @@ model Doc {
   senderId            Int
   sender              User             @relation("DocsSent", fields: [senderId], references: [id])
   docHeader           String
-  topic               Topic
   docInfo             String
   status              Status           @default(PENDING)
   contentPDF          String?
@@ -36,10 +35,9 @@ model Doc {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   recipients          DocRecipient[]
-  deleted             Boolean          @default(false) // เพิ่มฟิลด์นี้
+  deleted             Boolean          @default(false)
   deletedAt           DateTime?
 }
-
 
 model DocRecipient {
   id          Int      @id @default(autoincrement())
@@ -48,11 +46,11 @@ model DocRecipient {
   recipientId Int
   recipient   User     @relation(fields: [recipientId], references: [id])
   status      Status   @default(PENDING)
-  step        Int      
+  step        Int
+  topic       Topic    
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
-
 
 enum Role {
   ADMIN

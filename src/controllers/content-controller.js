@@ -91,13 +91,6 @@ exports.GetAllDoc = async (req, res, next) => {
 
 
 
-
-
-///////////////// Doc By ID
-
-
-
-
 exports.getDocById = async (req, res, next) => {
   const docId = parseInt(req.params.docId); // Parse docId to integer
 
@@ -184,12 +177,12 @@ exports.CreateDocumentWithRecipients = async (req, res, next) => {
         docInfo: content.docInfo,
         contentPDF: content.contentPDF,
         supportingDocuments: content.supportingDocuments,
-        topic: content.topic,
         recipients: {
           create: content.recipients.map(recipient => ({
             recipientId: parseInt(recipient.recipientId),
             status: recipient.status || 'PENDING',
-            step: parseInt(recipient.step) || 1
+            step: parseInt(recipient.step) || 1,
+            topic: recipient.topic || 'APPROVE' // จัดเก็บหัวข้อใน DocRecipient
           }))
         }
       }
@@ -197,13 +190,14 @@ exports.CreateDocumentWithRecipients = async (req, res, next) => {
 
     const step1Recipients = content.recipients.filter(recipient => parseInt(recipient.step) === 1);
     const totalSteps = Math.max(...content.recipients.map(recipient => parseInt(recipient.step) || 1));
-    await notifyRecipients(step1Recipients, datadoc.id, content.docNumber, content.docHeader, content.docInfo, content.contentPDF, content.supportingDocuments, sender, totalSteps, content.topic);
+    await notifyRecipients(step1Recipients, datadoc.id, content.docNumber, content.docHeader, content.docInfo, content.contentPDF, content.supportingDocuments, sender, totalSteps);
 
     res.status(200).json({ datadoc });
   } catch (err) {
     next(err);
   }
 };
+
 
 const notifyRecipients = async (recipients, docId, docNumber, docHeader, docInfo, contentPDF, supportingDocuments, sender, totalSteps, topic) => {
   for (let recipient of recipients) {
@@ -246,7 +240,7 @@ const notifyRecipients = async (recipients, docId, docNumber, docHeader, docInfo
         sender.department,
         recipient.step,
         totalSteps,
-        topic,
+        recipient.topic, // เพิ่ม topic ที่นี่
         previousApprovedStepsInfo
       );
     } catch (error) {
@@ -254,6 +248,7 @@ const notifyRecipients = async (recipients, docId, docNumber, docHeader, docInfo
     }
   }
 };
+
 
 const getPreviousApprovedStepsInfo = async (docId) => {
   const previousApprovedSteps = await prisma.docRecipient.findMany({
@@ -309,8 +304,6 @@ exports.approveDocument = async (req, res, next) => {
       where: { docId: parseInt(docId) },
       select: { step: true }
     })).map(r => r.step));
-    
-    console.log(`currentStep: ${currentRecipient.step}, totalSteps: ${totalSteps}`);
 
     if (allApproved) {
       const nextStepRecipients = await prisma.docRecipient.findMany({
@@ -318,12 +311,11 @@ exports.approveDocument = async (req, res, next) => {
       });
 
       if (nextStepRecipients.length > 0) {
-        await notifyRecipients(nextStepRecipients, parseInt(docId), doc.docNumber, doc.docHeader, doc.docInfo, doc.contentPDF, doc.supportingDocuments, sender, totalSteps, doc.topic);
+        await notifyRecipients(nextStepRecipients, parseInt(docId), doc.docNumber, doc.docHeader, doc.docInfo, doc.contentPDF, doc.supportingDocuments, sender, totalSteps);
       }
 
       const previousApprovedStepsInfo = await getPreviousApprovedStepsInfo(docId);
 
-    
       await sendNotificationToSender(
         sender.email,
         doc.docNumber,
@@ -334,12 +326,11 @@ exports.approveDocument = async (req, res, next) => {
         sender.department,
         currentRecipient.step,
         totalSteps,
-        doc.topic,
+        currentRecipient.topic, // เพิ่ม topic ที่นี่
         previousApprovedStepsInfo,
         currentRecipient.step === totalSteps ? 'APPROVED' : 'PENDING'
       );
 
-      // อัปเดตสถานะเอกสารเป็น 'APPROVED' เฉพาะเมื่อถึงขั้นตอนสุดท้ายและทุกคนอนุมัติแล้วเท่านั้น
       if (currentRecipient.step === totalSteps) {
         await prisma.doc.update({
           where: { id: parseInt(docId) },
@@ -349,7 +340,6 @@ exports.approveDocument = async (req, res, next) => {
     } else {
       const previousApprovedStepsInfo = await getPreviousApprovedStepsInfo(docId);
 
-      
       await sendNotificationToSender(
         sender.email,
         doc.docNumber,
@@ -360,7 +350,7 @@ exports.approveDocument = async (req, res, next) => {
         sender.department,
         currentRecipient.step,
         totalSteps,
-        doc.topic,
+        currentRecipient.topic, // เพิ่ม topic ที่นี่
         previousApprovedStepsInfo,
         'PENDING'
       );
@@ -371,6 +361,7 @@ exports.approveDocument = async (req, res, next) => {
     next(err);
   }
 };
+
 
 exports.rejectDocument = async (req, res, next) => {
   try {
@@ -403,7 +394,6 @@ exports.rejectDocument = async (req, res, next) => {
 
     const previousApprovedStepsInfo = await getPreviousApprovedStepsInfo(docId);
 
-    // ส่งอีเมลแจ้งเตือนผู้ส่งเอกสาร
     await sendNotificationToSender(
       sender.email,
       doc.docNumber,
@@ -413,8 +403,8 @@ exports.rejectDocument = async (req, res, next) => {
       doc.supportingDocuments,
       sender.department,
       currentRecipient.step,
-      1,  // Rejection doesn't need total steps, so it's set to 1.
-      doc.topic,
+      1, // Rejection doesn't need total steps, so it's set to 1.
+      currentRecipient.topic, // เพิ่ม topic ที่นี่
       previousApprovedStepsInfo,
       'REJECT'
     );
@@ -424,6 +414,9 @@ exports.rejectDocument = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
 
 exports.softDeleteDocument = async (req, res, next) => {
   try {
@@ -446,79 +439,171 @@ exports.softDeleteDocument = async (req, res, next) => {
 };
 
 
+// exports.updateDocument = async (req, res, next) => {
+//   try {
+//     const { docId } = req.params;
+//     const content = req.body;
+
+//     const existingDoc = await prisma.doc.findUnique({ where: { id: parseInt(docId) } });
+//     if (!existingDoc) {
+//       return res.status(404).send('ไม่พบเอกสารที่ระบุ');
+//     }
+
+//     if (req.files && req.files.contentPDF) {
+//       const uploadedPDF = await upload(req.files.contentPDF[0].path);
+//       content.contentPDF = uploadedPDF;
+//       await fs.unlink(req.files.contentPDF[0].path);
+//     }
+
+//     if (req.files && req.files.supportingDocuments) {
+//       const uploadedSupportingDocument = await upload(req.files.supportingDocuments[0].path);
+//       content.supportingDocuments = uploadedSupportingDocument;
+//       await fs.unlink(req.files.supportingDocuments[0].path);
+//     }
+
+//     const updatedDoc = await prisma.doc.update({
+//       where: { id: parseInt(docId) },
+//       data: {
+//         docNumber: content.docNumber || existingDoc.docNumber,
+//         docHeader: content.docHeader || existingDoc.docHeader,
+//         docInfo: content.docInfo || existingDoc.docInfo,
+//         contentPDF: content.contentPDF || existingDoc.contentPDF,
+//         supportingDocuments: content.supportingDocuments || existingDoc.supportingDocuments
+//       }
+//     });
+
+//     if (content.recipients && Array.isArray(content.recipients)) {
+//       // ลบ recipients เดิมทั้งหมด
+//       await prisma.docRecipient.deleteMany({
+//         where: { docId: parseInt(docId) }
+//       });
+
+//       // เพิ่ม recipients ใหม่
+//       const recipientUpdates = content.recipients.map(async recipient => {
+//         const recipientId = parseInt(recipient.recipientId);
+//         const step = parseInt(recipient.step) || 1;
+//         const topic = recipient.topic || 'APPROVE';
+
+//         if (isNaN(recipientId)) {
+//           throw new Error(`Invalid recipient ID: ${recipient.recipientId}`);
+//         }
+
+//         return prisma.docRecipient.create({
+//           data: {
+//             docId: parseInt(docId),
+//             recipientId: recipientId,
+//             status: recipient.status || 'PENDING',
+//             step: step,
+//             topic: topic // จัดเก็บหัวข้อใน DocRecipient
+//           }
+//         });
+//       });
+
+//       await Promise.all(recipientUpdates);
+//     }
+
+//     res.status(200).json({ updatedDoc });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+
 exports.updateDocument = async (req, res, next) => {
   try {
-      const { docId } = req.params;
-      const content = req.body;
+    const { docId } = req.params;
+    const content = req.body;
 
-      const existingDoc = await prisma.doc.findUnique({ where: { id: parseInt(docId) } });
-      if (!existingDoc) {
-          return res.status(404).send('ไม่พบเอกสารที่ระบุ');
+    const existingDoc = await prisma.doc.findUnique({ where: { id: parseInt(docId) } });
+    if (!existingDoc) {
+      return res.status(404).send('ไม่พบเอกสารที่ระบุ');
+    }
+
+    if (req.files && req.files.contentPDF) {
+      const uploadedPDF = await upload(req.files.contentPDF[0].path);
+      content.contentPDF = uploadedPDF;
+      await fs.unlink(req.files.contentPDF[0].path);
+    }
+
+    if (req.files && req.files.supportingDocuments) {
+      const uploadedSupportingDocument = await upload(req.files.supportingDocuments[0].path);
+      content.supportingDocuments = uploadedSupportingDocument;
+      await fs.unlink(req.files.supportingDocuments[0].path);
+    }
+
+    const updatedDoc = await prisma.doc.update({
+      where: { id: parseInt(docId) },
+      data: {
+        docNumber: content.docNumber || existingDoc.docNumber,
+        docHeader: content.docHeader || existingDoc.docHeader,
+        docInfo: content.docInfo || existingDoc.docInfo,
+        contentPDF: content.contentPDF || existingDoc.contentPDF,
+        supportingDocuments: content.supportingDocuments || existingDoc.supportingDocuments
       }
+    });
 
-      // จัดการอัปโหลดไฟล์
-      if (req.files && req.files.contentPDF) {
-          const uploadedPDF = await upload(req.files.contentPDF[0].path);
-          content.contentPDF = uploadedPDF;
-          await fs.unlink(req.files.contentPDF[0].path);
-      }
+    let newRecipients = [];
 
-      if (req.files && req.files.supportingDocuments) {
-          const uploadedSupportingDocument = await upload(req.files.supportingDocuments[0].path);
-          content.supportingDocuments = uploadedSupportingDocument;
-          await fs.unlink(req.files.supportingDocuments[0].path);
-      }
-
-      // อัปเดตเอกสาร
-      const updatedDoc = await prisma.doc.update({
-          where: { id: parseInt(docId) },
-          data: {
-              docNumber: content.docNumber || existingDoc.docNumber,
-              docHeader: content.docHeader || existingDoc.docHeader,
-              docInfo: content.docInfo || existingDoc.docInfo,
-              contentPDF: content.contentPDF || existingDoc.contentPDF,
-              supportingDocuments: content.supportingDocuments || existingDoc.supportingDocuments,
-              topic: content.topic || existingDoc.topic,
-          }
+    if (content.recipients && Array.isArray(content.recipients)) {
+      // ลบ recipients เดิมทั้งหมด
+      await prisma.docRecipient.deleteMany({
+        where: { docId: parseInt(docId) }
       });
 
-      // อัปเดตผู้รับ
-      if (content.recipients && Array.isArray(content.recipients)) {
-          const recipientUpdates = content.recipients.map(async recipient => {
-              const recipientId = parseInt(recipient.recipientId);
-              const step = parseInt(recipient.step) || 1;
+      // เพิ่ม recipients ใหม่
+      const recipientUpdates = content.recipients.map(async recipient => {
+        const recipientId = parseInt(recipient.recipientId);
+        const step = parseInt(recipient.step) || 1;
+        const topic = recipient.topic || 'APPROVE';
 
-              if (isNaN(recipientId)) {
-                  throw new Error(`Invalid recipient ID: ${recipient.recipientId}`);
-              }
+        if (isNaN(recipientId)) {
+          throw new Error(`Invalid recipient ID: ${recipient.recipientId}`);
+        }
 
-              if (recipient.id) {
-                  return prisma.docRecipient.update({
-                      where: { id: parseInt(recipient.id) },
-                      data: {
-                          recipientId: recipientId,
-                          status: recipient.status || 'PENDING',
-                          step: step
-                      }
-                  });
-              } else {
-                  return prisma.docRecipient.create({
-                      data: {
-                          docId: parseInt(docId),
-                          recipientId: recipientId,
-                          status: recipient.status || 'PENDING',
-                          step: step
-                      }
-                  });
-              }
-          });
+        const newRecipient = await prisma.docRecipient.create({
+          data: {
+            docId: parseInt(docId),
+            recipientId: recipientId,
+            status: recipient.status || 'PENDING',
+            step: step,
+            topic: topic // จัดเก็บหัวข้อใน DocRecipient
+          }
+        });
 
-          await Promise.all(recipientUpdates);
-      }
+        newRecipients.push(newRecipient);
 
-      res.status(200).json({ updatedDoc });
+        return newRecipient;
+      });
+
+      await Promise.all(recipientUpdates);
+    }
+
+    // ส่งอีเมลแจ้งเตือนผู้รับเอกสาร
+    const sender = await prisma.user.findUnique({ where: { id: existingDoc.senderId } });
+    newRecipients.forEach(async (recipient) => {
+      const user = await prisma.user.findUnique({ where: { id: recipient.recipientId } });
+      await sendEmail(
+        user.email,
+        'เอกสารถูกอัปเดต',
+        docId,
+        recipient.recipientId,
+        updatedDoc.docNumber,
+        updatedDoc.docHeader,
+        updatedDoc.docInfo,
+        updatedDoc.contentPDF,
+        updatedDoc.supportingDocuments,
+        `${sender.firstName} ${sender.lastName}`,
+        sender.department,
+        recipient.step,
+        newRecipients.length,
+        recipient.topic,
+        [] // previousApprovedSteps should be fetched if needed
+      );
+    });
+
+    res.status(200).json({ updatedDoc });
   } catch (err) {
-      next(err);
+    next(err);
   }
 };
-
